@@ -1,0 +1,110 @@
+#!/usr/bin/php -q
+<?php
+// Set our paths.
+define('ROOT_PATH', dirname(__FILE__) . DIRECTORY_SEPARATOR);
+
+// The script being called.
+$called     = $argv[0];
+
+// Allowed commands.
+$commands   = array('start', 'stop', 'config-test', 'status');
+
+// Remove the caller.
+array_shift($argv);
+
+// Check if the called command is allowed.
+if (empty($argv[0]) || !in_array($argv[0], $commands))
+{
+    exit("Usage: $called (start|stop|config-test|status|log)\n");
+}
+
+// Some arguments can supply a bot config - check for it.
+$config = str_replace('.php', '', (empty($argv[1]) ? 'default' : $argv[1]));
+$cfile  = ROOT_PATH . '.' . $config . '.php';
+
+// Include the bot config.
+if (!file_exists($cfile))
+{
+    exit("Bot configuration '$config' is missing.");
+}
+
+// Check what we're being asked to do.
+switch ($argv[0])
+{
+    case 'stop':
+        exit("Not yet implemented\n");
+        break;
+
+    case 'config-test':
+        // Check if the PHP alone is valid.
+        system('php -l ' . $cfile);
+        exit;
+        break;
+
+    case 'status':
+        exit("Not yet implemented\n");
+        break;
+
+    case 'log':
+        exit("Not yet implemented\n");
+        break;
+}
+
+// Grab the IRC class.
+require_once(ROOT_PATH . 'irc.php');
+
+/**
+ * Create a new bot.
+ */
+$bot    = new IRC(array(
+    'nickname'      =>  'Whatever',
+    'alt_nickname'  =>  'What?',
+    'real_name'     =>  'Whatever',
+    'owner'         =>  'xlefay',
+    'server'        =>  'irc.soylentnews.org:6697',
+    'ssl'           =>  true,
+    'network'       =>  'SoylentNews'
+));
+
+/**
+ * Set up hooks for before and after connecting.
+ */
+$before = function() use ($bot)
+{
+    // Do something.
+};
+
+$after  = function() use ($bot)
+{
+    echo "!! Sending commands!\n";
+    $bot->send('JOIN #test');
+    echo "!! Done sending commands!\n";
+};
+
+/**
+ * Set up an action.
+ */
+//$bot->addAction(2, 'PING', function($data) use ($bot)
+//{
+//    $bot->send('PONG :' . $data->source);
+//});
+
+/**
+ * Connect to IRC.
+ */
+try
+{
+    $bot->connect(null, $after);
+}
+catch(Exception $e)
+{
+    exit($e->getMessage() . "\n");
+}
+
+/**
+ * Do whatever we want.
+ */
+while ($data = $bot->get())
+{
+    echo "< " . implode(' ', (array) $data) . "\n";
+}
