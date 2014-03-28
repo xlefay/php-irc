@@ -109,7 +109,7 @@ class IRC
         }
 
         // Create the connection.
-        $this->socket   = fsockopen($server, $port, $err_no, $err_str, $this->config->timeout);
+        $this->socket   = fsockopen($server, $port, $err_no, $err_str, $config_timeout);
 
         // Check if all went well.
         if (!$this->socket)
@@ -136,18 +136,18 @@ class IRC
 
         while ($attach && $data = $this->get())
         {
-            echo "< " . implode(' ', (array) $data) . "\n";
+            $this->log("< " . implode(' ', (array) $data));
 
             // Looking up our hostname.
             if ($data->event == '001')
             {
-                echo "!! Connected!\n";
+                $this->log("!! Connected!");
             }
 
             // End of motd.
             if ($data->event == '376')
             {
-                echo "!! EOM!\n";
+                $this->log("!! EOM!");
 
                 // Detach.
                 $attach = false;
@@ -175,7 +175,7 @@ class IRC
         fputs($this->socket, $data . "\n");
 
         // Debug.
-        echo "> " . $data . "\n";
+        $this->log("> " . $data);
     }
 
     /**
@@ -227,38 +227,75 @@ class IRC
             // The message.
             $output->message    = implode(' ', $data);
         }
+        else // events like PING?
+        {
+            $output->event  = array_shift($data);
+            $output->sender = substr(array_shift($data), 1);
+        }
 
         return (object) (count($output) > 0) ? $output : $data;
     }
 
     /**
-     * Get the data from the socket.
+     * Add an event.
      *
-     * @return string
+     * @param $event
+     * @param $handler
+     */
+    public function addEvent($event, $handler)
+    {
+        $this->events[$event]   = $handler;
+    }
+
+    /**
+     * Get data from the socket.
+     *
+     * @return mixed|string
+     * @throws Exception
      */
     public function get()
     {
         // Get the data.
         $data   = fgets($this->socket);
 
+        // There should always be data, if there isn't, just stop.
+        if (empty($data))
+        {
+            throw new \Exception("No data returned.");
+        }
+
         // Parse it.
         $data   = $this->parse($data);
 
+        // Debug.
+        $this->log('Got event: ' . $data->event, 'debug');
+
         // Check if there's an event.
-        if (isset($data->event) && in_array($data->event, $this->events))
+        if (isset($data->event) && isset($this->events[$data->event]))
         {
             // Temporary variable to hold "something" in.
             $event  = $this->events[$data->event];
 
-            if (is_closure($event))
+            if ($event instanceof \Closure)
             {
-                $event($data);
+                $retval = $event($data);
+
+                $this->log('Ran event: ' . $data->event . '. ' . (empty($retval) ? 'No return value' : 'Return value: ' . $retval), 'debug');
             }
         }
 
-        // hooks.
-
         // Return the data.
         return $data;
+    }
+
+    /**
+     * Write to the console.
+     *
+     * @param $message
+     * @param string $level
+     */
+    public function log($message, $level = 'normal')
+    {
+        echo sprintf("[%s] - %s: %s\n", date('H:i:s'), $level, $message);
     }
 }

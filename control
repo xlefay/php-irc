@@ -56,15 +56,7 @@ require_once(ROOT_PATH . 'irc.php');
 /**
  * Create a new bot.
  */
-$bot    = new IRC(array(
-    'nickname'      =>  'Whatever',
-    'alt_nickname'  =>  'What?',
-    'real_name'     =>  'Whatever',
-    'owner'         =>  'xlefay',
-    'server'        =>  'irc.soylentnews.org:6697',
-    'ssl'           =>  true,
-    'network'       =>  'SoylentNews'
-));
+$bot    = new IRC(require_once($cfile));
 
 /**
  * Set up hooks for before and after connecting.
@@ -76,35 +68,36 @@ $before = function() use ($bot)
 
 $after  = function() use ($bot)
 {
-    echo "!! Sending commands!\n";
     $bot->send('JOIN #test');
-    echo "!! Done sending commands!\n";
 };
 
 /**
- * Set up an action.
+ * Set up an event.
  */
-//$bot->addAction(2, 'PING', function($data) use ($bot)
-//{
-//    $bot->send('PONG :' . $data->source);
-//});
+$bot->addEvent('PING', function($data) use ($bot)
+{
+    $bot->send('PONG :' . $data->sender);
+});
 
 /**
  * Connect to IRC.
  */
 try
 {
+    /**
+     * Connect.
+     */
     $bot->connect(null, $after);
+
+    /**
+     * Do stuff.
+     */
+    while ($data = $bot->get())
+    {
+        $bot->log("< " . implode(' ', (array) $data));
+    }
 }
 catch(Exception $e)
 {
     exit($e->getMessage() . "\n");
-}
-
-/**
- * Do whatever we want.
- */
-while ($data = $bot->get())
-{
-    echo "< " . implode(' ', (array) $data) . "\n";
 }
